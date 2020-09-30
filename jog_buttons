@@ -1,0 +1,118 @@
+#addition by Eithan Schonberg
+
+'''
+A few thing before you try this:
+
+add this code to the bottom of the existing code
+
+for esthtic reasons add to calframe.grid- rowspan=2 -(or place it whereever you want)
+
+!!!   in dict_of_buttons check the diretions are right CW/CCW   !!!
+
+dict_of_buttons has all the needed properties for the functions to work (and not need to write six differet functions)
+
+
+I tried to debug the code but I don't have all those motors connected to my pi so....
+
+
+
+'''
+
+
+
+jobid = None
+
+
+dict_of_buttons={"fence left":(DIR_f,STEP_f,CW_f,fencezero,fenceendpos,fen,fdelay,Current_fence_position,stp_per_inch_f),
+                 "fence right":(DIR_f,STEP_f,CCW_f,fencezero,fenceendpos,fen,fdelay,Current_fence_position,stp_per_inch_f),
+                 "blade up":(DIR_h,STEP_h,CW_h,heightzero,heightend,height,hdelay,C_height_e,stp_per_inch_h),
+                 "blade down":(DIR_h,STEP_h,CCW_h,heightzero,heightend,height,hdelay,C_height_e,stp_per_inch_h),
+                 "tilt up":(DIR_a,STEP_a,CW_a,angle0,angle45,ang,adelay,C_angle_e,stp_per_inch_a),
+                 "tilt down":(DIR_a,STEP_a,CCW_a,angle0,angle45,ang,adelay,C_angle_e,stp_per_inch_a)}
+#                   index:     0     1      2      3       4     5    6      7           8                    it helps when you try to figure out what happens in the code
+
+step_counter=0
+
+def button_press(event):
+    #find out what button was pressed
+    global list_of_buttons
+    current_button_pins=list_of_buttons[event.widget['text']]
+    
+    current_element_entry=current_button_pins[5]
+    current_element_entry.delete(0, END)
+    
+    GPIO.setmode(GPIO.BOARD)                          #GPIO setup
+    GPIO.setup(current_button_pins[0], GPIO.OUT)
+    GPIO.setup(current_button_pins[1], GPIO.OUT)
+    GPIO.setup(current_button_pins[3], GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+    GPIO.setup(current_button_pins[4], GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+    jog_move(event,current_button_pins)
+
+def jog_move(event,current_button_pins):
+    global jobid
+    global step_counter
+    if GPIO.input(current_button_pins[3]) == True or GPIO.input(current_button_pins[4]) == True:    #limit sensores
+        button_release(event)                                                                       #stopping the movement
+    
+    if current_button_pins[2]==1:                 #if moving CCW then steps are negative 
+        step_counter-=1
+    else:                                         #if moving CW then steps are positive 
+        step_counter+=1
+    
+    GPIO.output(current_button_pins[0], current_button_pins[2])
+    GPIO.output(current_button_pins[1], GPIO.HIGH)
+    sleep(current_button_pins[6])
+    GPIO.output(current_button_pins[1], GPIO.LOW)
+    #no need for another sleep because the .after delays the next occurrence
+    
+    #update current position
+    current_position_entry=current_button_pins[7]
+    
+    start_position= current_position_entry.get()
+    new_position=start_position+step_counter/current_button_pins[8]
+    step_counter=0
+    
+    current_position_entry.delete(0,END)
+    current_position_entry.insert(0, str(new_position))
+    
+    #recalling the jog funcion
+    
+    jobid = root.after(current_button_pins[6]/1000, jog_move, event)     # the .after call the function again after time set in miliseconds 
+                                                                         # and the release function cancels the pending job
+
+def button_release(event):
+    global jobid
+    
+    root.after_cancel(jobid)
+    
+
+jogframe=LabelFrame(root, text= "Jog", padx= xpadframe, pady=20 )
+jogframe.grid(row=1, column=1, columnspan=3)
+
+button_jogfence_l = Button(jogframe, text="fence left", padx=xpadbutton, pady=ypadbutton)
+button_jogfence_r = Button(jogframe, text="fence right", padx=xpadbutton, pady=ypadbutton)
+button_jogblade_u = Button(jogframe, text="blade up", padx=xpadbutton, pady=ypadbutton)
+button_jogblade_d = Button(jogframe, text="blade down", padx=xpadbutton, pady=ypadbutton)
+button_jogblade_angle_u = Button(jogframe, text="tilt up", padx=xpadbutton, pady=ypadbutton)
+button_jogblade_angle_d = Button(jogframe, text="tilt down", padx=xpadbutton, pady=ypadbutton)
+
+button_jogfence_l.grid(row=0, column=0)
+button_jogfence_r.grid(row=0, column=1)
+button_jogblade_u.grid(row=0, column=3)
+button_jogblade_d.grid(row=1, column=3)
+button_jogblade_angle_u.grid(row=0, column=5)
+button_jogblade_angle_d.grid(row=1, column=5)
+
+button_jogfence_l.bind('<Button-1>',button_press)
+button_jogfence_r.bind('<Button-1>',button_press)
+button_jogblade_u.bind('<Button-1>',button_press)
+button_jogblade_d.bind('<Button-1>',button_press)
+button_jogblade_angle_u.bind('<Button-1>',button_press)
+button_jogblade_angle_d.bind('<Button-1>',button_press)
+
+button_jogfence_l.bind('<ButtonRelease-1>',button_release)
+button_jogfence_r.bind('<ButtonRelease-1>',button_release)
+button_jogblade_u.bind('<ButtonRelease-1>',button_release)
+button_jogblade_d.bind('<ButtonRelease-1>',button_release)
+button_jogblade_angle_u.bind('<ButtonRelease-1>',button_release)
+button_jogblade_angle_d.bind('<ButtonRelease-1>',button_release)
